@@ -1,15 +1,14 @@
 name: Generate Invoice PDF from Frontend
 
-# Is workflow ko API se trigger karne ke liye
 on:
   repository_dispatch:
-    types: [generate-invoice-event] # Yeh naam Netlify Function wale naam se match hona chahiye
+    types: [generate-invoice-event]
 
 jobs:
   build-pdf:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Is job ko repository mein likhne ki ijazat dena
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -24,8 +23,6 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run PDF generator with frontend data
-        # Hum GITHUB_EVENT_PATH environment variable ka istemal kar rahe hain
-        # jise GitHub Actions khud faraham karta hai
         run: python main.py
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
