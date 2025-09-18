@@ -1,36 +1,60 @@
-name: Generate Invoice PDF from Frontend
+name: Generate and Store Invoice in DB
 
 on:
   repository_dispatch:
     types: [generate-invoice-event]
 
 jobs:
-  build-pdf:
+  build-and-store-pdf:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # Step 1: Apni repo (invoice-generator) ka code checkout karna
+      - name: Checkout Generator Code
+        uses: actions/checkout@v4
 
+      # Step 2: Python set up karna
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
+      # Step 3: Zaroori libraries install karna
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run PDF generator with frontend data
+      # Step 4: Frontend se aaye data se PDF banana
+      - name: Run PDF generator
         run: python main.py
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
 
-      - name: Commit PDF file
+      # Step 5: Nayi DB repo (dispatch-os-db) ko checkout karna
+      - name: Checkout DB Repository
+        uses: actions/checkout@v4
+        with:
+          repository: chuh31481-wq/dispatch-os-db # DB repo ka path
+          path: .db # Isay .db naam ke folder mein checkout karo
+          ssh-key: ${{ secrets.DB_DEPLOY_KEY }} # Hamari private key
+
+      # Step 6: Bani hui PDF ko DB repo ke folder mein move karna
+      - name: Move PDF to DB folder
         run: |
-          git config --global user.name 'GitHub Actions'
+          # Frontend se company ka data_folder name haasil karna
+          DATA_FOLDER=$(echo '${{ toJSON(github.event.client_payload) }}' | jq -r '.company.data_folder')
+          INVOICE_NUMBER=$(echo '${{ toJSON(github.event.client_payload) }}' | jq -r '.invoice_data.invoice_number')
+          
+          # Sahi folder banana agar mojood nahi hai
+          mkdir -p .db/$DATA_FOLDER/invoices
+          
+          # PDF file ko sahi jagah move karna
+          mv invoices/Invoice-${INVOICE_NUMBER}.pdf .db/$DATA_FOLDER/invoices/
+
+      # Step 7: Nayi PDF file ko DB repo mein commit aur push karna
+      - name: Commit and Push to DB Repo
+        run: |
+          cd .db
+          git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'actions@github.com'
-          git add invoices/*.pdf
-          git commit -m "Generate invoice from frontend" || echo "No changes to commit"
+          git add .
+          git commit -m "docs: Add new invoice via automated workflow" || echo "No changes to commit"
           git push
